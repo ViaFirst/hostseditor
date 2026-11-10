@@ -1,0 +1,16 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Translations complete
+        run: ./scripts/check-strings.sh
+      - name: Build
+        run: swift build -c release
+      - name: Self-test
+        run: "$(swift build -c release --show-bin-path)/HostsEditor --self-test"

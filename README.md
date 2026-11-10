@@ -28,3 +28,7 @@ Self-tests (never touch the real `/etc/hosts`):
 `HOSTSEDITOR_FILE=/path/to/file` makes the app edit another file (no admin prompt if it is writable).
 
 Languages: English, Russian, Hebrew (RTL).
+
+## License
+
+MIT, see [LICENSE](LICENSE).

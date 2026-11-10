@@ -4,7 +4,7 @@
   before larger changes; follow its invariants (EN + RU + HE via `L()`, key codes for shortcuts,
   self-tests, stable signing, CHANGELOG + `scripts/bump-version.sh`).
 - Distribution channel: personal
-- Git: private on ViaFirst (not created yet)
+- Git: public on ViaFirst, https://github.com/ViaFirst/hostseditor (MIT)
 - Build/install: `./build.sh install`. Tests: `--self-test`, `--render-test <png>`.
 - Kind: window + menu-bar (`LSUIElement` YES; Dock icon only while the window is open).
 - Writing: `HostsWriter` → `do shell script … with administrator privileges` (cat into the resolved
