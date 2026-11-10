@@ -1,0 +1,18 @@
+/* HostsEditor: en. Key = English text. */
+
+"Open HostsEditor" = "Open HostsEditor";
+"Launch at Login" = "Launch at Login";
+"Quit HostsEditor" = "Quit HostsEditor";
+"Hide HostsEditor" = "Hide HostsEditor";
+"File" = "File";
+"Close" = "Close";
+"Edit" = "Edit";
+"Undo" = "Undo";
+"Redo" = "Redo";
+"Cut" = "Cut";
+"Copy" = "Copy";
+"Paste" = "Paste";
+"Select All" = "Select All";
+"Hello from HostsEditor" = "Hello from HostsEditor";
+"Clicked %d times" = "Clicked %d times";
+"Click me" = "Click me";

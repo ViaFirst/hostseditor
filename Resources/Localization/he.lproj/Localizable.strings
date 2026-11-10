@@ -1,0 +1,18 @@
+/* HostsEditor: he. Key = English text. */
+
+"Open HostsEditor" = "פתיחת HostsEditor";
+"Launch at Login" = "פתיחה בעת ההתחברות";
+"Quit HostsEditor" = "יציאה מ־HostsEditor";
+"Hide HostsEditor" = "הסתרת HostsEditor";
+"File" = "קובץ";
+"Close" = "סגירה";
+"Edit" = "עריכה";
+"Undo" = "ביטול פעולה";
+"Redo" = "ביצוע חוזר";
+"Cut" = "גזירה";
+"Copy" = "העתקה";
+"Paste" = "הדבקה";
+"Select All" = "בחירת הכל";
+"Hello from HostsEditor" = "שלום מ־HostsEditor";
+"Clicked %d times" = "נלחץ %d פעמים";
+"Click me" = "לחצו כאן";

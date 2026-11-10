@@ -1,0 +1,18 @@
+/* HostsEditor: ru. Key = English text. */
+
+"Open HostsEditor" = "Открыть HostsEditor";
+"Launch at Login" = "Запускать при входе";
+"Quit HostsEditor" = "Выйти из HostsEditor";
+"Hide HostsEditor" = "Скрыть HostsEditor";
+"File" = "Файл";
+"Close" = "Закрыть";
+"Edit" = "Правка";
+"Undo" = "Отменить";
+"Redo" = "Повторить";
+"Cut" = "Вырезать";
+"Copy" = "Копировать";
+"Paste" = "Вставить";
+"Select All" = "Выбрать всё";
+"Hello from HostsEditor" = "Привет от HostsEditor";
+"Clicked %d times" = "Нажато раз: %d";
+"Click me" = "Нажми меня";
