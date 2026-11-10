@@ -1,7 +1,7 @@
 import AppKit
 
-/// Main menu. Its key equivalents travel the responder chain, so text fields and custom
-/// views get standard behaviour (also in a menu-bar app while one of its windows is open).
+/// Main menu. Items without a target travel the responder chain (EditorViewController, NSWindow,
+/// text fields), so ⌘Z/⌘C/⌘S work wherever the focus is.
 enum MainMenu {
     static func make() -> NSMenu {
         let main = NSMenu()
@@ -13,6 +13,15 @@ enum MainMenu {
         add(appMenu, title: "HostsEditor", to: main)
 
         let file = NSMenu(title: L("File"))
+        file.addItem(withTitle: L("Add Entry"), action: #selector(EditorViewController.addEntry(_:)), keyEquivalent: "n")
+        let comment = file.addItem(withTitle: L("Add Comment"), action: #selector(EditorViewController.addComment(_:)), keyEquivalent: "n")
+        comment.keyEquivalentModifierMask = [.command, .shift]
+        file.addItem(.separator())
+        file.addItem(withTitle: L("Apply Changes"), action: #selector(EditorViewController.applyChanges(_:)), keyEquivalent: "s")
+        file.addItem(withTitle: L("Revert to File"), action: #selector(EditorViewController.revertChanges(_:)), keyEquivalent: "")
+        file.addItem(withTitle: L("Reload from Disk"), action: #selector(EditorViewController.reloadFromDisk(_:)), keyEquivalent: "r")
+        file.addItem(withTitle: L("Show Backups in Finder"), action: #selector(AppDelegate.showBackups(_:)), keyEquivalent: "")
+        file.addItem(.separator())
         file.addItem(withTitle: L("Close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         add(file, title: L("File"), to: main)
 
@@ -24,8 +33,17 @@ enum MainMenu {
         edit.addItem(withTitle: L("Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         edit.addItem(withTitle: L("Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         edit.addItem(withTitle: L("Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        // ⌘⌫, not a bare ⌫: a bare Delete must keep deleting characters in text fields.
+        edit.addItem(withTitle: L("Delete"), action: #selector(EditorViewController.delete(_:)), keyEquivalent: "\u{8}")
         edit.addItem(withTitle: L("Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(.separator())
+        edit.addItem(withTitle: L("Find"), action: #selector(EditorViewController.performFindPanelAction(_:)), keyEquivalent: "f")
         add(edit, title: L("Edit"), to: main)
+
+        let window = NSMenu(title: L("Window"))
+        window.addItem(withTitle: L("Minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        add(window, title: L("Window"), to: main)
+        NSApp.windowsMenu = window
         return main
     }
 

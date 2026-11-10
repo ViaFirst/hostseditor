@@ -8,6 +8,6 @@ MainActor.assumeIsolated {
     }
     let delegate = AppDelegate()
     app.delegate = delegate
-    app.setActivationPolicy(AppDelegate.isMenuBarApp ? .accessory : .regular)
+    app.setActivationPolicy(.regular)
     app.run()
 }
