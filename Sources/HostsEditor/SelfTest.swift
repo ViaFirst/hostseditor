@@ -36,6 +36,7 @@ enum SelfTest {
     static func runIfRequested() -> Bool {
         let args = CommandLine.arguments
         if args.contains("--self-test") { selfTest() }
+        if args.contains("--menu-dump") { menuDump() }
         if let i = args.firstIndex(of: "--render-test"), i + 1 < args.count {
             renderTest(out: args[i + 1])
             return true
@@ -100,6 +101,63 @@ enum SelfTest {
         HostsDocument.move(&items, from: [0], to: 3)
         check(items == [1, 2, 0], "move to end \(items)")
 
+        // Sorting inside comment-delimited groups
+        let messy = HostsDocument.parse("""
+        127.0.0.1 localhost
+        10.0.0.9 zeta.test
+        10.0.0.10 www.alpha.test alpha.test
+
+        # 9.9.9.9 beta.test
+        ## Local - Start ##
+        ::1 site.local
+        127.0.0.1 site.local
+        ::1 app.local
+        127.0.0.1 app.local
+        ## Local - End ##
+
+        """)
+        let byDomain = HostsDocument.sorted(messy.rows, by: .domain)
+        check(byDomain.map { $0.isComment ? "#" : $0.hostnameList[0] + "@" + $0.ip } ==
+              ["localhost@127.0.0.1", "www.alpha.test@10.0.0.10", "beta.test@9.9.9.9", "zeta.test@10.0.0.9", "#",
+               "app.local@127.0.0.1", "app.local@::1", "site.local@127.0.0.1", "site.local@::1", "#"],
+              "sort by domain keeps groups, system first, IPv4 before IPv6")
+        check(byDomain.map(\.blankLinesBefore) == messy.rows.map(\.blankLinesBefore), "blank lines stay in place")
+        let byIP = HostsDocument.sorted(messy.rows, by: .ip)
+        check(byIP.prefix(4).map(\.ip) == ["127.0.0.1", "9.9.9.9", "10.0.0.9", "10.0.0.10"], "sort by IP is numeric \(byIP.prefix(4).map(\.ip))")
+        let onFirst = HostsDocument.sorted(messy.rows, by: .enabledFirst)
+        check(onFirst[3].hostnameList[0] == "beta.test" && !onFirst[3].enabled, "disabled entries go last in their group")
+        check(HostsDocument.sorted(byDomain, by: .domain).map(\.id) == byDomain.map(\.id), "sorting twice changes nothing")
+
+        // Duplicates
+        let dups = HostsDocument.parse("1.1.1.1 a.test b.test\n# 1.1.1.1 b.test a.test\n#1.1.1.1 c.test\n#1.1.1.1 c.test\n2.2.2.2 a.test\n")
+        let dedup = HostsDocument.removingDuplicates(dups.rows)
+        check(dedup.removed == 2 && dedup.rows.count == 3, "duplicates removed (\(dedup.removed))")
+        check(dedup.rows[0].enabled && !dedup.rows[1].enabled, "kept copy stays enabled; disabled pair stays disabled")
+
+        // Menu model: LocalWP pairs merge, servers become alternatives, sections from comments, A–Z
+        let menuDoc = HostsDocument.parse("""
+        127.0.0.1 localhost
+        172.19.0.2 reuth.org.uk www.reuth.org.uk
+        #209.35.197.53 reuth.org.uk www.reuth.org.uk
+        172.19.0.3 files.budget.co.il
+        ## Local - Start ##
+        ::1 budget.local #Local Site
+        127.0.0.1 budget.local #Local Site
+        ::1 acf.local
+        127.0.0.1 acf.local
+        ::1 www.acf.local
+        127.0.0.1 www.acf.local
+        ## Local - End ##
+        172.19.0.9 stg.example.com
+        """)
+        let sections = HostsMenuModel.build(menuDoc.rows)
+        check(sections.count == 3 && sections[0].title == nil && sections[1].title == "Local" && sections[2].title == nil, "menu sections \(sections.map { $0.title ?? "-" })")
+        check(sections[0].entries.map(\.title) == ["files.budget.co.il", "reuth.org.uk"], "server block A–Z, www twin hidden")
+        check(sections[0].entries[1].hasAlternatives && sections[0].entries[1].rows.count == 2, "two servers for one site = alternatives")
+        check(sections[1].entries.map(\.title) == ["acf.local", "budget.local"], "LocalWP pairs merged and sorted")
+        check(!sections[1].entries[0].hasAlternatives && sections[1].entries[0].ips == "::1, 127.0.0.1", "127.0.0.1 + ::1 is one switch")
+        check(sections[1].entries[0].rows.count == 4, "www. lines merged into the site item")
+
         // Store on a temp file
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("HostsEditorTest-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -144,6 +202,19 @@ enum SelfTest {
 
         print(failures == 0 ? "ALL PASS" : "\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
+    }
+
+    /// Prints the menu-bar menu for the real hosts file (read only): `HostsEditor --menu-dump`.
+    private static func menuDump() {
+        let text = (try? String(contentsOf: HostsStore.defaultURL, encoding: .utf8)) ?? ""
+        for section in HostsMenuModel.build(HostsDocument.parse(text).rows) {
+            print("== \(section.title ?? "(no title)")")
+            for e in section.entries {
+                let state = e.allOn ? "[x]" : (e.anyOn ? "[-]" : "[ ]")
+                print(state, e.title, "—", e.hasAlternatives ? "choose: " + e.rows.map { ($0.enabled ? "*" : "") + $0.ip }.joined(separator: " | ") : e.ips)
+            }
+        }
+        exit(0)
     }
 
     /// Shows the editor with sample data in a window below the desktop, then draws it into a PNG.

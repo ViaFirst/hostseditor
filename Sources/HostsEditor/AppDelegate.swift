@@ -58,21 +58,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        let entries = store.rows.filter { !$0.isComment && !$0.isSystem }
-        if entries.isEmpty {
+        let sections = HostsMenuModel.build(store.rows)
+        if sections.isEmpty {
             let none = NSMenuItem(title: L("No entries yet"), action: nil, keyEquivalent: "")
             none.isEnabled = false
             menu.addItem(none)
         }
-        for r in entries {
-            var title = r.hostnames.isEmpty ? r.ip : r.hostnames
-            if title.count > 60 { title = String(title.prefix(57)) + "…" }
-            let i = NSMenuItem(title: title, action: #selector(toggleFromMenu(_:)), keyEquivalent: "")
-            i.target = self
-            i.state = r.enabled ? .on : .off
-            i.representedObject = r.id
-            i.toolTip = r.ip + (r.comment.isEmpty ? "" : " — " + r.comment)
-            menu.addItem(i)
+        for (n, section) in sections.enumerated() {
+            if n > 0 { menu.addItem(.separator()) }
+            if let title = section.title { menu.addItem(.sectionHeader(title: title)) }
+            for entry in section.entries { menu.addItem(menuItem(for: entry)) }
         }
         menu.addItem(.separator())
         if store.isDirty {
@@ -93,14 +88,76 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         return i
     }
 
+    private static func short(_ s: String) -> String { s.count > 60 ? String(s.prefix(57)) + "…" : s }
+
+    /// One item per site: a switch for all its lines (127.0.0.1 + ::1), or a submenu when the names
+    /// point at different servers (pick one, the others go off).
+    private func menuItem(for entry: HostsMenuModel.Entry) -> NSMenuItem {
+        let item = NSMenuItem(title: Self.short(entry.title), action: nil, keyEquivalent: "")
+        item.state = entry.allOn ? .on : (entry.anyOn ? .mixed : .off)
+        if entry.hasAlternatives {
+            let sub = NSMenu()
+            sub.userInterfaceLayoutDirection = AppLayout.direction
+            for r in entry.rows {
+                let alt = NSMenuItem(title: r.ip, action: #selector(chooseAlternative(_:)), keyEquivalent: "")
+                alt.target = self
+                alt.state = r.enabled ? .on : .off
+                alt.representedObject = [r.id] + entry.rows.map(\.id).filter { $0 != r.id }
+                if !r.comment.isEmpty { alt.setSubtitle(r.comment) }
+                sub.addItem(alt)
+            }
+            sub.addItem(.separator())
+            let off = NSMenuItem(title: L("Turn All Off"), action: #selector(turnAllOff(_:)), keyEquivalent: "")
+            off.target = self
+            off.representedObject = entry.rows.map(\.id)
+            off.isEnabled = entry.anyOn
+            sub.addItem(off)
+            item.submenu = sub
+            item.setSubtitle(entry.rows.first(where: \.enabled).map(\.ip) ?? L("Off"))
+        } else {
+            item.action = #selector(toggleFromMenu(_:))
+            item.target = self
+            item.representedObject = entry.rows.map(\.id)
+            item.setSubtitle(entry.ips)
+        }
+        return item
+    }
+
     /// A switch in the menu is applied right away (one password prompt). Cancelled -> the switch is undone.
-    @objc private func toggleFromMenu(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? UUID,
-              let i = store.rows.firstIndex(where: { $0.id == id }) else { return }
-        let on = !store.rows[i].enabled
-        store.update(on ? L("Enable Entry") : L("Disable Entry")) { $0[i].enabled = on }
+    private func changeAndApply(_ actionName: String, _ change: (inout [HostsRow]) -> Void) {
+        store.update(actionName, change)
         NSApp.activate(ignoringOtherApps: true)   // the password dialog and alerts come to the front
-        if !editor.applyNow() { store.undoManager.undo() }
+        if store.isDirty && !editor.applyNow() { store.undoManager.undo() }
+    }
+
+    @objc private func toggleFromMenu(_ sender: NSMenuItem) {
+        guard let ids = sender.representedObject as? [UUID] else { return }
+        let rows = store.rows.filter { ids.contains($0.id) }
+        let on = !rows.allSatisfy(\.enabled)
+        changeAndApply(on ? L("Enable Entry") : L("Disable Entry")) { rows in
+            for i in rows.indices where ids.contains(rows[i].id) { rows[i].enabled = on }
+        }
+    }
+
+    /// representedObject: [chosen id, other ids of the same site]. Chosen on -> it alone is enabled.
+    @objc private func chooseAlternative(_ sender: NSMenuItem) {
+        guard let ids = sender.representedObject as? [UUID], let chosen = ids.first,
+              let place = store.rows.first(where: { $0.id == chosen }).map({ HostsMenuModel.ipClass($0.ip) }) else { return }
+        let turnOn = sender.state != .on
+        changeAndApply(turnOn ? L("Enable Entry") : L("Disable Entry")) { rows in
+            // Lines pointing at the chosen place (127.0.0.1 and ::1 count as one) go on, the rest off.
+            for i in rows.indices where ids.contains(rows[i].id) {
+                let samePlace = HostsMenuModel.ipClass(rows[i].ip) == place
+                rows[i].enabled = turnOn ? samePlace : (samePlace ? false : rows[i].enabled)
+            }
+        }
+    }
+
+    @objc private func turnAllOff(_ sender: NSMenuItem) {
+        guard let ids = sender.representedObject as? [UUID] else { return }
+        changeAndApply(L("Disable Entry")) { rows in
+            for i in rows.indices where ids.contains(rows[i].id) { rows[i].enabled = false }
+        }
     }
 
     @objc private func applyFromMenu() {
@@ -156,5 +213,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Back to a menu-bar-only app; focus returns to the previous app.
         NSApp.setActivationPolicy(.accessory)
         NSApp.hide(nil)
+    }
+}
+
+
+extension NSMenuItem {
+    /// Grey second line (macOS 14.4+); older systems show the text as a tooltip.
+    func setSubtitle(_ text: String) {
+        if #available(macOS 14.4, *) { subtitle = text } else { toolTip = text }
     }
 }

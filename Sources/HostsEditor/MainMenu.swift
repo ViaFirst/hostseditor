@@ -2,6 +2,7 @@ import AppKit
 
 /// Main menu. Items without a target travel the responder chain (EditorViewController, NSWindow,
 /// text fields), so ⌘Z/⌘C/⌘S work wherever the focus is.
+@MainActor
 enum MainMenu {
     static func make() -> NSMenu {
         let main = NSMenu()
@@ -13,10 +14,6 @@ enum MainMenu {
         add(appMenu, title: "HostsEditor", to: main)
 
         let file = NSMenu(title: L("File"))
-        file.addItem(withTitle: L("Add Entry"), action: #selector(EditorViewController.addEntry(_:)), keyEquivalent: "n")
-        let comment = file.addItem(withTitle: L("Add Comment"), action: #selector(EditorViewController.addComment(_:)), keyEquivalent: "n")
-        comment.keyEquivalentModifierMask = [.command, .shift]
-        file.addItem(.separator())
         file.addItem(withTitle: L("Apply Changes"), action: #selector(EditorViewController.applyChanges(_:)), keyEquivalent: "s")
         file.addItem(withTitle: L("Revert to File"), action: #selector(EditorViewController.revertChanges(_:)), keyEquivalent: "")
         file.addItem(withTitle: L("Reload from Disk"), action: #selector(EditorViewController.reloadFromDisk(_:)), keyEquivalent: "r")
@@ -39,6 +36,14 @@ enum MainMenu {
         edit.addItem(.separator())
         edit.addItem(withTitle: L("Find"), action: #selector(EditorViewController.performFindPanelAction(_:)), keyEquivalent: "f")
         add(edit, title: L("Edit"), to: main)
+
+        let entries = NSMenu(title: L("Entries"))
+        entries.addItem(withTitle: L("Add Entry"), action: #selector(EditorViewController.addEntry(_:)), keyEquivalent: "n")
+        let comment = entries.addItem(withTitle: L("Add Comment"), action: #selector(EditorViewController.addComment(_:)), keyEquivalent: "n")
+        comment.keyEquivalentModifierMask = [.command, .shift]
+        entries.addItem(.separator())
+        for item in EditorViewController.sortMenuItems() { entries.addItem(item) }
+        add(entries, title: L("Entries"), to: main)
 
         let window = NSMenu(title: L("Window"))
         window.addItem(withTitle: L("Minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")

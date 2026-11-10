@@ -92,6 +92,15 @@ final class EditorViewController: NSViewController, NSTableViewDataSource, NSTab
         removeButton.action = #selector(delete(_:))
         removeButton.widthAnchor.constraint(equalToConstant: 28).isActive = true
         let addComment = barButton("text.bubble", L("Add Comment"), #selector(addComment(_:)))
+        let sort = NSPopUpButton(frame: .zero, pullsDown: true)
+        sort.bezelStyle = .smallSquare
+        sort.toolTip = L("Sort and clean up")
+        sort.widthAnchor.constraint(equalToConstant: 46).isActive = true
+        let sortTitle = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        sortTitle.image = NSImage(systemSymbolName: "arrow.up.arrow.down", accessibilityDescription: L("Sort and clean up"))
+        sort.menu?.addItem(sortTitle)
+        for item in Self.sortMenuItems() { sort.menu?.addItem(item) }
+        sort.menu?.userInterfaceLayoutDirection = AppLayout.direction
 
         status.textColor = .secondaryLabelColor
         status.lineBreakMode = .byTruncatingTail
@@ -104,12 +113,12 @@ final class EditorViewController: NSViewController, NSTableViewDataSource, NSTab
         applyButton.bezelColor = .controlAccentColor
         applyButton.toolTip = L("Write the changes to /etc/hosts (⌘S)")
 
-        let bar = NSStackView(views: [add, removeButton, addComment, status, revertButton, applyButton])
+        let bar = NSStackView(views: [add, removeButton, addComment, sort, status, revertButton, applyButton])
         bar.userInterfaceLayoutDirection = AppLayout.direction
         bar.orientation = .horizontal
         bar.distribution = .fill
         bar.spacing = 6
-        bar.setCustomSpacing(14, after: addComment)
+        bar.setCustomSpacing(14, after: sort)
         bar.setCustomSpacing(14, after: status)
         status.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
@@ -353,6 +362,41 @@ final class EditorViewController: NSViewController, NSTableViewDataSource, NSTab
         }
         let next = min(first, visible.count - 1)
         table.selectRowIndexes(next >= 0 ? [next] : [], byExtendingSelection: false)
+    }
+
+    // MARK: Sort / clean up
+
+    /// Shared by the bottom-bar pull-down and the Entries menu (targets go through the responder chain).
+    static func sortMenuItems() -> [NSMenuItem] {
+        [
+            NSMenuItem(title: L("Sort by Domain"), action: #selector(sortByDomain(_:)), keyEquivalent: ""),
+            NSMenuItem(title: L("Sort by IP Address"), action: #selector(sortByIP(_:)), keyEquivalent: ""),
+            NSMenuItem(title: L("Sort: Enabled First"), action: #selector(sortEnabledFirst(_:)), keyEquivalent: ""),
+            .separator(),
+            NSMenuItem(title: L("Remove Duplicates"), action: #selector(removeDuplicates(_:)), keyEquivalent: ""),
+        ]
+    }
+
+    @objc func sortByDomain(_ sender: Any?) { sort(.domain) }
+    @objc func sortByIP(_ sender: Any?) { sort(.ip) }
+    @objc func sortEnabledFirst(_ sender: Any?) { sort(.enabledFirst) }
+
+    private func sort(_ order: HostsSortOrder) {
+        view.window?.makeFirstResponder(table)
+        if !search.stringValue.isEmpty { search.stringValue = "" }
+        store.update(L("Sort")) { rows in rows = HostsDocument.sorted(rows, by: order) }
+        reload()
+    }
+
+    @objc func removeDuplicates(_ sender: Any?) {
+        view.window?.makeFirstResponder(table)
+        let result = HostsDocument.removingDuplicates(store.rows)
+        store.update(L("Remove Duplicates")) { rows in rows = result.rows }
+        let alert = NSAlert()
+        alert.messageText = result.removed == 0 ? L("No duplicates found")
+            : String(format: L("Duplicates removed: %d"), result.removed)
+        if result.removed > 0 { alert.informativeText = L("Not written yet: press Apply to save, or Undo (⌘Z).") }
+        alert.runModal()
     }
 
     // MARK: Drag to reorder
